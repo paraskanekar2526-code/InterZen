@@ -395,27 +395,116 @@ function Auth({ mode = "login" }) {
     setError("");
 
     try {
-      const endpoint = isLogin ? "/auth/login" : "/auth/register";
+      /*
+        ==============================
+        REGISTER
+        ==============================
+      */
 
-      const data = await apiRequest(endpoint, {
+      if (!isLogin) {
+        // Remove any old login information
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("userName");
+
+        const data = await apiRequest("/auth/register", {
+          method: "POST",
+          body: JSON.stringify({
+            name: form.name,
+            email: form.email,
+            password: form.password
+          })
+        });
+
+        /*
+          IMPORTANT:
+          Do NOT store token during registration.
+
+          User must verify email first.
+        */
+
+        localStorage.setItem(
+          "interzen_verification_email",
+          form.email
+        );
+
+        // Go to email verification page
+        navigate("/verify-email");
+
+        return;
+      }
+
+      /*
+        ==============================
+        LOGIN
+        ==============================
+      */
+
+      const data = await apiRequest("/auth/login", {
         method: "POST",
-        body: JSON.stringify(form)
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password
+        })
       });
 
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("userName",
-      data.user?.name ||
-      data.user?.username ||
-      data.name ||
-      data.username ||""
-      );
-      localStorage.setItem("user", JSON.stringify(data.user));
-      localStorage.setItem("interzen_verification_email",form.email);
-      if (!isLogin) {navigate("/email-verification");
-      } else {navigate("/dashboard");
+      /*
+        Login is allowed only after
+        successful email verification.
+      */
+
+      if (!data.token) {
+        throw new Error(
+          "Login successful, but no authentication token was received."
+        );
       }
+
+      // Save login token
+      localStorage.setItem(
+        "token",
+        data.token
+      );
+
+      // Save user information
+      localStorage.setItem(
+        "user",
+        JSON.stringify(data.user || {})
+      );
+
+      localStorage.setItem(
+        "userName",
+        data.user?.name ||
+        data.user?.username ||
+        data.name ||
+        data.username ||
+        ""
+      );
+
+      // Remove old verification data
+      localStorage.removeItem(
+        "interzen_verification_email"
+      );
+
+      // Go to dashboard
+      navigate("/dashboard");
+
     } catch (err) {
-      setError(err.message);
+      console.error(
+        isLogin
+          ? "Login Error:"
+          : "Registration Error:",
+        err
+      );
+
+      setError(
+        err.message ||
+        (
+          isLogin
+            ? "Unable to login."
+            : "Unable to create account."
+        )
+      );
+
     } finally {
       setLoading(false);
     }
@@ -424,9 +513,16 @@ function Auth({ mode = "login" }) {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div className="auth-logo">IZ</div>
 
-        <h2>{isLogin ? "Welcome Back" : "Create Your Account"}</h2>
+        <div className="auth-logo">
+          IZ
+        </div>
+
+        <h2>
+          {isLogin
+            ? "Welcome Back"
+            : "Create Your Account"}
+        </h2>
 
         <p>
           {isLogin
@@ -434,9 +530,14 @@ function Auth({ mode = "login" }) {
             : "Join InterZen and start preparing for your career."}
         </p>
 
-        {error && <div className="error-box">{error}</div>}
+        {error && (
+          <div className="error-box">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
+
           {!isLogin && (
             <input
               type="text"
@@ -477,19 +578,35 @@ function Auth({ mode = "login" }) {
               ? "Login"
               : "Create Account"}
           </button>
+
         </form>
 
         <p className="auth-switch">
-          {isLogin ? "Don't have an account?" : "Already have an account?"}
 
-          <Link to={isLogin ? "/register" : "/login"}>
-            {isLogin ? " Register" : " Login"}
+          {isLogin
+            ? "Don't have an account?"
+            : "Already have an account?"}
+
+          <Link
+            to={
+              isLogin
+                ? "/register"
+                : "/login"
+            }
+          >
+            {isLogin
+              ? " Register"
+              : " Login"}
           </Link>
+
         </p>
+
       </div>
     </div>
   );
 }
+
+
 function QuickCard({ icon, title, text, link }) {
   return (
     <Link to={link} className="quick-card">
@@ -16484,126 +16601,269 @@ function ResetPassword() {
     </div>
   );
 }
+
 function EmailVerification() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = React.useState(
-    localStorage.getItem("interzen_verification_email") || ""
+    localStorage.getItem(
+      "interzen_verification_email"
+    ) || ""
   );
 
   const [code, setCode] = React.useState("");
-  const [message, setMessage] = React.useState("");
-  const [error, setError] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [resendLoading, setResendLoading] = React.useState(false);
-  const [resendMessage, setResendMessage] = React.useState("");
-  
+
+  const [message, setMessage] =
+    React.useState("");
+
+  const [error, setError] =
+    React.useState("");
+
+  const [loading, setLoading] =
+    React.useState(false);
+
+  const [resendLoading, setResendLoading] =
+    React.useState(false);
+
+  const [resendMessage, setResendMessage] =
+    React.useState("");
+
+  /*
+    ==============================
+    VERIFY EMAIL
+    ==============================
+  */
+
   const handleVerify = async (e) => {
     e.preventDefault();
 
     setMessage("");
     setError("");
+    setResendMessage("");
 
     if (!email || !code) {
-      setError("Please enter your email and verification code.");
+      setError(
+        "Please enter your email and verification code."
+      );
       return;
     }
 
     try {
       setLoading(true);
 
-      await apiRequest("/auth/verify-email", {
-        method: "POST",
-        body: JSON.stringify({
-          email,
-          code
-        })
-      });
+      await apiRequest(
+        "/auth/verify-email",
+        {
+          method: "POST",
 
-      setMessage(
-        "Email verified successfully! You can now continue using InterZen."
+          body: JSON.stringify({
+            email,
+            code
+          })
+        }
       );
 
+      /*
+        Email verification successful.
+      */
+
+      setMessage(
+        "Email verified successfully!"
+      );
+
+      // Remove verification email
       localStorage.removeItem(
         "interzen_verification_email"
       );
+
+      // Make sure no old token remains
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("userName");
+
+      /*
+        Give the user a moment to see
+        the success message, then go to login.
+      */
+
+      setTimeout(() => {
+        navigate("/login");
+      }, 1500);
+
     } catch (err) {
-      setError(err.message);
+      console.error(
+        "Email Verification Error:",
+        err
+      );
+
+      setError(
+        err.message ||
+        "Unable to verify email."
+      );
+
     } finally {
       setLoading(false);
     }
   };
+
+  /*
+    ==============================
+    RESEND VERIFICATION
+    ==============================
+  */
+
   const handleResend = async () => {
-  setResendMessage("");
-  setError("");
 
-  if (!email) {
-    setError("Please enter your email first.");
-    return;
-  }
+    setResendMessage("");
+    setError("");
 
-  try {
-    setResendLoading(true);
+    if (!email) {
+      setError(
+        "Verification email is missing. Please register again."
+      );
+      return;
+    }
 
-    await apiRequest("/auth/resend-verification", {
-      method: "POST",
-      body: JSON.stringify({
-        email
-      })
-    });
+    try {
+      setResendLoading(true);
 
-    setResendMessage(
-      "New verification code generated. Check the backend terminal."
-    );
+      await apiRequest(
+        "/auth/resend-verification",
+        {
+          method: "POST",
 
-    setCode("");
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setResendLoading(false);
-  }
+          body: JSON.stringify({
+            email
+          })
+        }
+      );
+
+      setResendMessage(
+        "New verification code generated. Please check your email."
+      );
+
+      setCode("");
+
+    } catch (err) {
+
+      console.error(
+        "Resend Verification Error:",
+        err
+      );
+
+      /*
+        If the account is already verified,
+        do NOT show it as a serious error.
+      */
+
+      if (
+        err.message &&
+        err.message
+          .toLowerCase()
+          .includes("already verified")
+      ) {
+
+        localStorage.removeItem(
+          "interzen_verification_email"
+        );
+
+        setResendMessage(
+          "Your email is already verified. Redirecting to login..."
+        );
+
+        setTimeout(() => {
+          navigate("/login");
+        }, 1200);
+
+      } else {
+
+        setError(
+          err.message ||
+          "Unable to resend verification code."
+        );
+
+      }
+
+    } finally {
+      setResendLoading(false);
+    }
   };
+
   return (
     <div className="auth-page">
+
       <div className="auth-card">
-        <h2>Verify Your Email</h2>
+
+        <div className="auth-logo">
+          IZ
+        </div>
+
+        <h2>
+          Verify Your Email
+        </h2>
 
         <p>
-          Enter the 6-digit verification code generated
-          for your InterZen account.
+          Enter the 6-digit verification
+          code sent to your email address.
         </p>
 
         <form onSubmit={handleVerify}>
+
           <input
             type="email"
             placeholder="Enter your email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) =>
+              setEmail(e.target.value)
+            }
+            required
           />
 
           <input
             type="text"
             placeholder="Enter 6-digit code"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(e) =>
+              setCode(e.target.value)
+            }
             maxLength="6"
+            required
           />
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Verifying..." : "Verify Email"}
+          <button
+            type="submit"
+            disabled={loading}
+            className="primary-button full-width"
+          >
+            {loading
+              ? "Verifying..."
+              : "Verify Email"}
           </button>
+
           <button
             type="button"
             onClick={handleResend}
-            disabled={resendLoading}>
+            disabled={
+              resendLoading ||
+              loading
+            }
+            className="secondary-button full-width"
+            style={{
+              marginTop: "10px"
+            }}
+          >
             {resendLoading
-            ? "Sending..."
-            : "Resend Verification Code"}
+              ? "Sending..."
+              : "Resend Verification Code"}
           </button>
-          {resendMessage && (
-            <p className="success-message">
-            {resendMessage}
-            </p>
-          )}
+
         </form>
+
+        {resendMessage && (
+          <p className="success-message">
+            {resendMessage}
+          </p>
+        )}
 
         {message && (
           <p className="success-message">
@@ -16619,15 +16879,24 @@ function EmailVerification() {
 
         {message && (
           <p>
-            <a href="/login">
+            <button
+              type="button"
+              onClick={() =>
+                navigate("/login")
+              }
+              className="primary-button"
+            >
               Go to Login
-            </a>
+            </button>
           </p>
         )}
+
       </div>
+
     </div>
   );
 }
+
 
 function InterviewScheduling() {
   const [form, setForm] = React.useState({
