@@ -1,5 +1,4 @@
-
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://interzen-backend.onrender.com/api";
 
 export async function apiRequest(path, options = {}) {
   const token = localStorage.getItem("token");
