@@ -12,7 +12,7 @@ import {
 } from "react-router-dom";
 import EmotionDetection from "./components/EmotionDetection";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://interzen-backend.onrender.com/api";
 
 
 
@@ -1240,7 +1240,7 @@ try {
 
   const response =
     await fetch(
-      "http://localhost:5000/api/resumes/analysis",
+      "https://interzen-backend.onrender.com/api/resumes/analysis",
       {
         method: "POST",
 
@@ -2005,7 +2005,7 @@ function QuestionGenerator() {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/internhelp",
+      "https://interzen-backend.onrender.com/api/internhelp",
       {
         method: "POST",
         headers: {
@@ -2405,7 +2405,7 @@ Rules:
 `;
 
       const response = await fetch(
-        "http://localhost:5000/api/internhelp",
+        "https://interzen-backend.onrender.com/api/internhelp",
         {
           method: "POST",
           headers: {
@@ -2529,7 +2529,7 @@ Rules:
 `;
 
     const response = await fetch(
-      "http://localhost:5000/api/internhelp",
+      "https://interzen-backend.onrender.com/api/internhelp",
       {
         method: "POST",
         headers: {
@@ -7891,7 +7891,7 @@ Rules:
 `;
 
   const response = await fetch(
-    "http://localhost:5000/api/internhelp",
+    "https://interzen-backend.onrender.com/api/internhelp",
     {
       method: "POST",
       headers: {
@@ -9488,7 +9488,7 @@ Rules:
 `;
 
       const response = await fetch(
-        "http://localhost:5000/api/internhelp",
+        "https://interzen-backend.onrender.com/api/internhelp",
         {
           method: "POST",
 
@@ -10213,7 +10213,7 @@ Rules:
 `;
 
       const response = await fetch(
-        "http://localhost:5000/api/internhelp",
+        "https://interzen-backend.onrender.com/api/internhelp",
         {
           method: "POST",
           headers: {
@@ -12094,7 +12094,7 @@ content:
       if (!token) return;
 
       const response = await fetch(
-        "http://localhost:5000/api/progress/courses",
+        "https://interzen-backend.onrender.com/api/progress/courses",
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -12160,7 +12160,7 @@ content:
       if (!token) return;
 
       const response = await fetch(
-        "http://localhost:5000/api/progress/courses",
+        "https://interzen-backend.onrender.com/api/progress/courses",
         {
           headers: {
             Authorization:
@@ -12244,7 +12244,7 @@ content:
 
       const response =
         await fetch(
-          "http://localhost:5000/api/progress/enroll",
+          "https://interzen-backend.onrender.com/api/progress/enroll",
           {
             method: "POST",
 
@@ -12410,7 +12410,7 @@ content:
 
       const response =
         await fetch(
-          "http://localhost:5000/api/progress/lesson-complete",
+          "https://interzen-backend.onrender.com/api/progress/lesson-complete",
           {
             method: "POST",
 
@@ -12807,7 +12807,7 @@ const downloadCertificate = async () => {
 
       const response =
         await fetch(
-          "http://localhost:5000/api/internhelp",
+          "https://interzen-backend.onrender.com/api/internhelp",
           {
             method: "POST",
 
@@ -13053,7 +13053,7 @@ Rules:
 
       const response =
         await fetch(
-          "http://localhost:5000/api/progress/quiz-submit",
+          "https://interzen-backend.onrender.com/api/progress/quiz-submit",
           {
             method: "POST",
 
@@ -15427,7 +15427,7 @@ function AdminPanel() {
       }
 
       const response = await fetch(
-        "http://localhost:5000/api/admin/users",
+        "https://interzen-backend.onrender.com/api/admin/users",
         {
           method: "GET",
           headers: {
@@ -15498,7 +15498,7 @@ function AdminPanel() {
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/admin/users/${userId}`,
+        `https://interzen-backend.onrender.com/api/admin/users/${userId}`,
         {
           method: "DELETE",
           headers: {
