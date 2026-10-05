@@ -24,7 +24,19 @@ const PORT = process.env.PORT || 5000;
 // MIDDLEWARE
 // ==============================
 
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://interzen-frontend.onrender.com"
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+  })
+);
+
+app.options("*", cors());
 
 app.use(express.json());
 
