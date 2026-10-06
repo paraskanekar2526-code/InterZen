@@ -1,362 +1,65 @@
 
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-// ==========================================
-// EMAIL CONFIG
-// ==========================================
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-console.log("======================================");
-console.log("📧 EMAIL SERVICE STARTING");
-console.log("======================================");
+const FROM_EMAIL =
+  process.env.RESEND_FROM_EMAIL || "InterZen <onboarding@resend.dev>";
 
-console.log(
-  "📧 EMAIL_USER:",
-  process.env.EMAIL_USER || "NOT SET"
-);
-
-console.log(
-  "🔐 EMAIL_PASSWORD:",
-  process.env.EMAIL_PASSWORD
-    ? "SET"
-    : "NOT SET"
-);
-
-// ==========================================
-// GMAIL SMTP TRANSPORTER
-// ==========================================
-
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  },
-
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 15000
-});
-
-// ==========================================
-// VERIFY TRANSPORTER
-// ==========================================
-
-async function verifyEmailTransporter() {
-  try {
-
-    await transporter.verify();
-
-    console.log(
-      "✅ EMAIL TRANSPORTER READY"
-    );
-
-    console.log(
-      "📧 Email account:",
-      process.env.EMAIL_USER
-    );
-
-    return true;
-
-  } catch (error) {
-
-    console.error(
-      "❌ EMAIL TRANSPORTER ERROR"
-    );
-
-    console.error(
-      error.message
-    );
-
-    return false;
+async function sendEmail(to, subject, html) {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error("RESEND_API_KEY is not configured");
   }
-}
 
-verifyEmailTransporter();
+  console.log("📨 Sending email through Resend:", { to, subject });
 
-// ==========================================
-// SEND EMAIL
-// ==========================================
+  const { data, error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: [to],
+    subject,
+    html,
+  });
 
-async function sendEmail(
-  to,
-  subject,
-  html
-) {
-
-  console.log("");
-  console.log(
-    "======================================"
-  );
-
-  console.log(
-    "📨 SEND EMAIL STARTED"
-  );
-
-  console.log(
-    "📧 From:",
-    process.env.EMAIL_USER
-  );
-
-  console.log(
-    "📩 To:",
-    to
-  );
-
-  console.log(
-    "📝 Subject:",
-    subject
-  );
-
-  console.log(
-    "======================================"
-  );
-
-  try {
-
-    const info =
-      await transporter.sendMail({
-
-        from:
-          `"InterZen" <${process.env.EMAIL_USER}>`,
-
-        to: to,
-
-        subject: subject,
-
-        html: html
-
-      });
-
-    console.log("");
-    console.log(
-      "✅ EMAIL SENT SUCCESSFULLY"
-    );
-
-    console.log(
-      "📨 Message ID:",
-      info.messageId
-    );
-
-    console.log(
-      "📬 Server response:",
-      info.response
-    );
-
-    return info;
-
-  } catch (error) {
-
-    console.error("");
-    console.error(
-      "❌ EMAIL SENDING FAILED"
-    );
-
-    console.error(
-      "Message:",
-      error.message
-    );
-
-    console.error(
-      "Code:",
-      error.code
-    );
-
-    console.error(
-      "Command:",
-      error.command
-    );
-
-    throw error;
+  if (error) {
+    console.error("❌ Resend email error:", error.message);
+    throw new Error(`Resend email failed: ${error.message}`);
   }
+
+  console.log("✅ Resend accepted email:", data?.id);
+  return data;
 }
 
-// ==========================================
-// VERIFICATION OTP
-// ==========================================
+async function sendVerificationOTP(to, name, code) {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Welcome to InterZen, ${name}!</h2>
+      <p>Use this OTP to verify your email address:</p>
+      <h1 style="letter-spacing: 6px;">${code}</h1>
+      <p>This code expires in 10 minutes.</p>
+      <p>If you did not request this code, you can ignore this email.</p>
+    </div>
+  `;
 
-async function sendVerificationOTP(
-  to,
-  name,
-  code
-) {
-
-  console.log("");
-  console.log(
-    "🔐 VERIFICATION OTP FUNCTION CALLED"
-  );
-
-  console.log(
-    "📩 Recipient:",
-    to
-  );
-
-  console.log(
-    "👤 Name:",
-    name
-  );
-
-  console.log(
-    "🔢 OTP:",
-    code
-  );
-
-  return sendEmail(
-
-    to,
-
-    "InterZen - Email Verification OTP",
-
-    `
-      <div style="
-        font-family: Arial, sans-serif;
-        max-width: 600px;
-        margin: auto;
-      ">
-
-        <h2>
-          Welcome to InterZen, ${name}!
-        </h2>
-
-        <p>
-          Thank you for registering with InterZen.
-        </p>
-
-        <p>
-          Your email verification OTP is:
-        </p>
-
-        <div style="
-          font-size: 32px;
-          font-weight: bold;
-          letter-spacing: 8px;
-          padding: 20px;
-          background: #f3f4f6;
-          text-align: center;
-          margin: 20px 0;
-        ">
-
-          ${code}
-
-        </div>
-
-        <p>
-          This OTP is valid for
-          <strong>10 minutes</strong>.
-        </p>
-
-        <p>
-          If you did not create this account,
-          you can safely ignore this email.
-        </p>
-
-        <p>
-          Regards,<br>
-          <strong>InterZen Team</strong>
-        </p>
-
-      </div>
-    `
-  );
+  return sendEmail(to, "InterZen - Email Verification OTP", html);
 }
 
-// ==========================================
-// PASSWORD RESET OTP
-// ==========================================
+async function sendPasswordResetOTP(to, name, code) {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Password Reset</h2>
+      <p>Hello ${name},</p>
+      <p>Use this OTP to reset your InterZen password:</p>
+      <h1 style="letter-spacing: 6px;">${code}</h1>
+      <p>This code expires in 10 minutes.</p>
+      <p>If you did not request a password reset, ignore this email.</p>
+    </div>
+  `;
 
-async function sendPasswordResetOTP(
-  to,
-  name,
-  code
-) {
-
-  console.log("");
-  console.log(
-    "🔑 PASSWORD RESET OTP FUNCTION CALLED"
-  );
-
-  console.log(
-    "📩 Recipient:",
-    to
-  );
-
-  console.log(
-    "👤 Name:",
-    name
-  );
-
-  console.log(
-    "🔢 OTP:",
-    code
-  );
-
-  return sendEmail(
-
-    to,
-
-    "InterZen - Password Reset OTP",
-
-    `
-      <div style="
-        font-family: Arial, sans-serif;
-        max-width: 600px;
-        margin: auto;
-      ">
-
-        <h2>
-          InterZen Password Reset
-        </h2>
-
-        <p>
-          Hello ${name},
-        </p>
-
-        <p>
-          Your password reset OTP is:
-        </p>
-
-        <div style="
-          font-size: 32px;
-          font-weight: bold;
-          letter-spacing: 8px;
-          padding: 20px;
-          background: #f3f4f6;
-          text-align: center;
-          margin: 20px 0;
-        ">
-
-          ${code}
-
-        </div>
-
-        <p>
-          This OTP is valid for
-          <strong>10 minutes</strong>.
-        </p>
-
-        <p>
-          If you did not request this password reset,
-          please ignore this email.
-        </p>
-
-        <p>
-          Regards,<br>
-          <strong>InterZen Team</strong>
-        </p>
-
-      </div>
-    `
-  );
+  return sendEmail(to, "InterZen - Password Reset OTP", html);
 }
-
-// ==========================================
-// EXPORT
-// ==========================================
 
 module.exports = {
   sendEmail,
   sendVerificationOTP,
-  sendPasswordResetOTP
+  sendPasswordResetOTP,
 };
