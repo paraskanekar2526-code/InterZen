@@ -395,20 +395,20 @@ function Auth({ mode = "login" }) {
     setError("");
 
     try {
-      /*
-        ==============================
-        REGISTER
-        ==============================
-      */
+
+      /* ==============================
+         REGISTER
+      ============================== */
 
       if (!isLogin) {
-        // Remove any old login information
+
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         localStorage.removeItem("userName");
 
         const data = await apiRequest("/auth/register", {
           method: "POST",
+
           body: JSON.stringify({
             name: form.name,
             email: form.email,
@@ -417,41 +417,71 @@ function Auth({ mode = "login" }) {
         });
 
         /*
-          IMPORTANT:
-          Do NOT store token during registration.
+          Save email temporarily.
 
-          User must verify email first.
+          The EmailVerification page will
+          automatically use this email.
         */
 
         localStorage.setItem(
           "interzen_verification_email",
-          form.email
+          form.email.toLowerCase().trim()
         );
 
-        // Go to email verification page
-        navigate("/verify-email");
+        /*
+          IMPORTANT
+
+          Do NOT save JWT here.
+
+          User must verify OTP first.
+        */
+
+        /*
+          Go directly to the REAL
+          email OTP verification page.
+        */
+
+        navigate("/email-verification");
 
         return;
       }
 
-      /*
-        ==============================
-        LOGIN
-        ==============================
-      */
+
+      /* ==============================
+         LOGIN
+      ============================== */
 
       const data = await apiRequest("/auth/login", {
         method: "POST",
+
         body: JSON.stringify({
           email: form.email,
           password: form.password
         })
       });
 
+
       /*
-        Login is allowed only after
-        successful email verification.
+        If backend says email is not verified,
+        send user directly to OTP page.
       */
+
+      if (data.requiresVerification) {
+
+        localStorage.setItem(
+          "interzen_verification_email",
+          data.email || form.email
+        );
+
+        navigate("/email-verification");
+
+        return;
+      }
+
+
+      /* ==============================
+         LOGIN TOKEN
+      ============================== */
 
       if (!data.token) {
         throw new Error(
@@ -459,17 +489,18 @@ function Auth({ mode = "login" }) {
         );
       }
 
-      // Save login token
+
       localStorage.setItem(
         "token",
         data.token
       );
 
-      // Save user information
+
       localStorage.setItem(
         "user",
         JSON.stringify(data.user || {})
       );
+
 
       localStorage.setItem(
         "userName",
@@ -480,15 +511,20 @@ function Auth({ mode = "login" }) {
         ""
       );
 
-      // Remove old verification data
+
       localStorage.removeItem(
         "interzen_verification_email"
       );
 
-      // Go to dashboard
+
+      /*
+        Go to dashboard
+      */
+
       navigate("/dashboard");
 
     } catch (err) {
+
       console.error(
         isLogin
           ? "Login Error:"
@@ -506,17 +542,22 @@ function Auth({ mode = "login" }) {
       );
 
     } finally {
+
       setLoading(false);
+
     }
   };
 
+
   return (
     <div className="auth-page">
+
       <div className="auth-card">
 
         <div className="auth-logo">
           IZ
         </div>
+
 
         <h2>
           {isLogin
@@ -524,17 +565,20 @@ function Auth({ mode = "login" }) {
             : "Create Your Account"}
         </h2>
 
+
         <p>
           {isLogin
             ? "Login to continue your interview preparation."
             : "Join InterZen and start preparing for your career."}
         </p>
 
+
         {error && (
           <div className="error-box">
             {error}
           </div>
         )}
+
 
         <form onSubmit={handleSubmit}>
 
@@ -549,6 +593,7 @@ function Auth({ mode = "login" }) {
             />
           )}
 
+
           <input
             type="email"
             name="email"
@@ -557,6 +602,7 @@ function Auth({ mode = "login" }) {
             onChange={handleChange}
             required
           />
+
 
           <input
             type="password"
@@ -567,19 +613,32 @@ function Auth({ mode = "login" }) {
             required
           />
 
+
           <button
             type="submit"
             className="primary-button full-width"
             disabled={loading}
           >
+
             {loading
               ? "Please wait..."
               : isLogin
               ? "Login"
               : "Create Account"}
+
           </button>
 
         </form>
+
+
+        {isLogin && (
+          <p style={{ marginTop: "10px" }}>
+            <Link to="/forgot-password">
+              Forgot Password?
+            </Link>
+          </p>
+        )}
+
 
         <p className="auth-switch">
 
@@ -594,17 +653,21 @@ function Auth({ mode = "login" }) {
                 : "/login"
             }
           >
+
             {isLogin
               ? " Register"
               : " Login"}
+
           </Link>
 
         </p>
 
       </div>
+
     </div>
   );
 }
+
 
 
 function QuickCard({ icon, title, text, link }) {
@@ -16603,6 +16666,7 @@ function ResetPassword() {
 }
 
 function EmailVerification() {
+
   const navigate = useNavigate();
 
   const [email, setEmail] = React.useState(
@@ -16628,28 +16692,34 @@ function EmailVerification() {
   const [resendMessage, setResendMessage] =
     React.useState("");
 
-  /*
-    ==============================
-    VERIFY EMAIL
-    ==============================
-  */
+
+  /* ==============================
+     VERIFY EMAIL OTP
+  ============================== */
 
   const handleVerify = async (e) => {
+
     e.preventDefault();
 
     setMessage("");
     setError("");
     setResendMessage("");
 
+
     if (!email || !code) {
+
       setError(
-        "Please enter your email and verification code."
+        "Please enter the 6-digit OTP."
       );
+
       return;
     }
 
+
     try {
+
       setLoading(true);
+
 
       await apiRequest(
         "/auth/verify-email",
@@ -16657,75 +16727,88 @@ function EmailVerification() {
           method: "POST",
 
           body: JSON.stringify({
-            email,
-            code
+            email: email.trim(),
+            code: code.trim()
           })
         }
       );
 
+
       /*
-        Email verification successful.
+        OTP verified successfully.
       */
 
       setMessage(
-        "Email verified successfully!"
+        "Email verified successfully! Redirecting to login..."
       );
 
-      // Remove verification email
+
       localStorage.removeItem(
         "interzen_verification_email"
       );
 
-      // Make sure no old token remains
+
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("userName");
 
+
       /*
-        Give the user a moment to see
-        the success message, then go to login.
+        Give user time to see success message.
       */
 
       setTimeout(() => {
+
         navigate("/login");
+
       }, 1500);
 
+
     } catch (err) {
+
       console.error(
-        "Email Verification Error:",
+        "Email OTP Verification Error:",
         err
       );
 
+
       setError(
         err.message ||
-        "Unable to verify email."
+        "Invalid or expired OTP."
       );
 
     } finally {
+
       setLoading(false);
+
     }
   };
 
-  /*
-    ==============================
-    RESEND VERIFICATION
-    ==============================
-  */
+
+  /* ==============================
+     RESEND OTP
+  ============================== */
 
   const handleResend = async () => {
 
     setResendMessage("");
     setError("");
 
+
     if (!email) {
+
       setError(
-        "Verification email is missing. Please register again."
+        "Email address is missing. Please register again."
       );
+
       return;
     }
 
+
     try {
+
       setResendLoading(true);
+
 
       await apiRequest(
         "/auth/resend-verification",
@@ -16733,63 +16816,43 @@ function EmailVerification() {
           method: "POST",
 
           body: JSON.stringify({
-            email
+            email: email.trim()
           })
         }
       );
 
+
       setResendMessage(
-        "New verification code generated. Please check your email."
+        "New OTP sent to your email."
       );
 
+
       setCode("");
+
 
     } catch (err) {
 
       console.error(
-        "Resend Verification Error:",
+        "Resend OTP Error:",
         err
       );
 
-      /*
-        If the account is already verified,
-        do NOT show it as a serious error.
-      */
 
-      if (
-        err.message &&
-        err.message
-          .toLowerCase()
-          .includes("already verified")
-      ) {
-
-        localStorage.removeItem(
-          "interzen_verification_email"
-        );
-
-        setResendMessage(
-          "Your email is already verified. Redirecting to login..."
-        );
-
-        setTimeout(() => {
-          navigate("/login");
-        }, 1200);
-
-      } else {
-
-        setError(
-          err.message ||
-          "Unable to resend verification code."
-        );
-
-      }
+      setError(
+        err.message ||
+        "Unable to resend OTP."
+      );
 
     } finally {
+
       setResendLoading(false);
+
     }
   };
 
+
   return (
+
     <div className="auth-page">
 
       <div className="auth-card">
@@ -16798,47 +16861,85 @@ function EmailVerification() {
           IZ
         </div>
 
+
         <h2>
           Verify Your Email
         </h2>
 
+
         <p>
-          Enter the 6-digit verification
-          code sent to your email address.
+          We have sent a 6-digit OTP to:
         </p>
+
+
+        <p>
+          <strong>
+            {email}
+          </strong>
+        </p>
+
+
+        <p>
+          Enter the OTP below to activate your
+          InterZen account.
+        </p>
+
+
+        {message && (
+          <div className="success-box">
+            {message}
+          </div>
+        )}
+
+
+        {resendMessage && (
+          <div className="success-box">
+            {resendMessage}
+          </div>
+        )}
+
+
+        {error && (
+          <div className="error-box">
+            {error}
+          </div>
+        )}
+
 
         <form onSubmit={handleVerify}>
 
           <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) =>
-              setEmail(e.target.value)
-            }
-            required
-          />
-
-          <input
             type="text"
-            placeholder="Enter 6-digit code"
+            inputMode="numeric"
+            placeholder="Enter 6-digit OTP"
             value={code}
             onChange={(e) =>
-              setCode(e.target.value)
+              setCode(
+                e.target.value
+                  .replace(/\D/g, "")
+                  .slice(0, 6)
+              )
             }
             maxLength="6"
             required
           />
 
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={
+              loading ||
+              code.length !== 6
+            }
             className="primary-button full-width"
           >
+
             {loading
               ? "Verifying..."
               : "Verify Email"}
+
           </button>
+
 
           <button
             type="button"
@@ -16852,50 +16953,57 @@ function EmailVerification() {
               marginTop: "10px"
             }}
           >
+
             {resendLoading
               ? "Sending..."
-              : "Resend Verification Code"}
+              : "Resend OTP"}
+
           </button>
 
         </form>
 
-        {resendMessage && (
-          <p className="success-message">
-            {resendMessage}
-          </p>
-        )}
 
-        {message && (
-          <p className="success-message">
-            {message}
-          </p>
-        )}
+        <p
+          style={{
+            marginTop: "20px"
+          }}
+        >
 
-        {error && (
-          <p className="error-message">
-            {error}
-          </p>
-        )}
+          Wrong email?
 
-        {message && (
-          <p>
-            <button
-              type="button"
-              onClick={() =>
-                navigate("/login")
-              }
-              className="primary-button"
-            >
-              Go to Login
-            </button>
-          </p>
-        )}
+          {" "}
+
+          <button
+            type="button"
+            onClick={() => {
+
+              localStorage.removeItem(
+                "interzen_verification_email"
+              );
+
+              navigate("/register");
+
+            }}
+            style={{
+              border: "none",
+              background: "none",
+              color: "#2563eb",
+              cursor: "pointer",
+              fontWeight: "600"
+            }}
+          >
+            Register again
+          </button>
+
+        </p>
 
       </div>
 
     </div>
+
   );
 }
+
 
 
 function InterviewScheduling() {
@@ -17484,9 +17592,9 @@ function App() {
           />
 
           <Route
-            path="/verify-email"
-            element={<VerifyEmail />}
-          />
+  path="/email-verification"
+  element={<EmailVerification />}
+/>
 
           <Route
             path="/reset-password"

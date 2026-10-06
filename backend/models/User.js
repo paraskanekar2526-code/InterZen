@@ -1,8 +1,11 @@
-
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
+    // ==========================================
+    // BASIC USER INFORMATION
+    // ==========================================
+
     name: {
       type: String,
       required: true,
@@ -17,16 +20,23 @@ const userSchema = new mongoose.Schema(
       trim: true
     },
 
+    // Password is optional because
+    // Google Login users do not need one.
     password: {
       type: String,
-      required: true
+      required: false,
+      default: null
     },
 
     role: {
-  type: String,
-  enum: ["student", "admin"],
-  default: "student"
-},
+      type: String,
+      enum: ["student", "admin"],
+      default: "student"
+    },
+
+    // ==========================================
+    // PERFORMANCE / DASHBOARD
+    // ==========================================
 
     resumeScore: {
       type: Number,
@@ -53,25 +63,29 @@ const userSchema = new mongoose.Schema(
       default: 0
     },
 
-    // Existing achievement count
+    // ==========================================
+    // GAMIFICATION
+    // ==========================================
+
     achievements: {
       type: Number,
       default: 0
     },
 
-    // Gamification points
     points: {
       type: Number,
       default: 0
     },
 
-    // Gamification level
     level: {
       type: Number,
       default: 1
     },
 
-    // Earned badges
+    // ==========================================
+    // EARNED BADGES
+    // ==========================================
+
     badges: [
       {
         name: {
@@ -89,7 +103,10 @@ const userSchema = new mongoose.Schema(
       }
     ],
 
-    // Detailed achievement records
+    // ==========================================
+    // DETAILED ACHIEVEMENTS
+    // ==========================================
+
     achievementList: [
       {
         title: {
@@ -112,6 +129,10 @@ const userSchema = new mongoose.Schema(
       }
     ],
 
+    // ==========================================
+    // PASSWORD RESET OTP
+    // ==========================================
+
     resetCode: {
       type: String,
       default: null
@@ -121,6 +142,10 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null
     },
+
+    // ==========================================
+    // EMAIL VERIFICATION OTP
+    // ==========================================
 
     emailVerified: {
       type: Boolean,
@@ -142,7 +167,10 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// ==========================================
+// EXPORT MODEL
+// ==========================================
+
 module.exports =
   mongoose.models.User ||
   mongoose.model("User", userSchema);
-
