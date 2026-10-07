@@ -434,41 +434,46 @@ exports.resendVerification = async (req, res) => {
 // LOGIN
 // ==========================================
 
-exports.login = async (
-  req,
-  res
-) => {
-
+exports.login = async (req, res) => {
   try {
+    const { email, password } = req.body;
 
-    const {
-      email,
-      password
-    } = req.body;
+    // ==========================================
+    // VALIDATION
+    // ==========================================
 
     if (!email || !password) {
       return res.status(400).json({
-        message:
-          "Email and password are required"
+        message: "Email and password are required"
       });
     }
 
-    const normalizedEmail =
-      email.toLowerCase().trim();
+    const normalizedEmail = email.toLowerCase().trim();
 
-    const user =
-      await User.findOne({
-        email: normalizedEmail
-      });
+    // ==========================================
+    // FIND USER
+    // ==========================================
+
+    const user = await User.findOne({
+      email: normalizedEmail
+    });
 
     if (!user) {
+      console.log("❌ LOGIN: User not found:", normalizedEmail);
+
       return res.status(401).json({
-        message:
-          "Invalid email or password"
+        message: "Invalid email or password"
       });
     }
 
-    // Google-only account
+    console.log("✅ LOGIN: User found:", user.email);
+    console.log("📧 Email verified:", user.emailVerified);
+    console.log("🔐 Password exists:", !!user.password);
+
+    // ==========================================
+    // GOOGLE-ONLY ACCOUNT
+    // ==========================================
+
     if (!user.password) {
       return res.status(401).json({
         message:
@@ -476,16 +481,20 @@ exports.login = async (
       });
     }
 
-    const passwordMatch =
-      await bcrypt.compare(
-        password,
-        user.password
-      );
+    // ==========================================
+    // CHECK PASSWORD
+    // ==========================================
+
+    const passwordMatch = await bcrypt.compare(
+      password,
+      user.password
+    );
+
+    console.log("🔑 Password match:", passwordMatch);
 
     if (!passwordMatch) {
       return res.status(401).json({
-        message:
-          "Invalid email or password"
+        message: "Invalid email or password"
       });
     }
 
@@ -494,7 +503,6 @@ exports.login = async (
     // ==========================================
 
     if (!user.emailVerified) {
-
       return res.status(403).json({
         message:
           "Please verify your email using the OTP before logging in.",
@@ -504,47 +512,30 @@ exports.login = async (
     }
 
     // ==========================================
-    // CREATE TOKEN
+    // CREATE JWT
     // ==========================================
 
-    const token =
-      createToken(user._id);
+    const token = createToken(user._id);
 
     return res.json({
-
-      message:
-        "Login successful",
+      message: "Login successful",
 
       token,
 
       user: {
-        id:
-          user._id,
-
-        name:
-          user.name,
-
-        email:
-          user.email,
-
-        role:
-          user.role,
-
-        emailVerified:
-          user.emailVerified
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        emailVerified: user.emailVerified
       }
     });
 
   } catch (error) {
-
-    console.error(
-      "Login Error:",
-      error
-    );
+    console.error("Login Error:", error);
 
     return res.status(500).json({
-      message:
-        "Login failed"
+      message: "Login failed"
     });
   }
 };
