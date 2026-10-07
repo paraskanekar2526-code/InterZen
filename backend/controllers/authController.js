@@ -258,6 +258,10 @@ exports.verifyEmail = async (
 
     const enteredCode =
       String(code).trim();
+      console.log("========== OTP DEBUG ==========");
+console.log("Verification Email:", normalizedEmail);
+console.log("Entered OTP:", enteredCode);
+console.log("================================");
 
     const user =
       await User.findOne({
