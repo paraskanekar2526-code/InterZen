@@ -434,6 +434,10 @@ exports.resendVerification = async (req, res) => {
 // LOGIN
 // ==========================================
 
+// ==========================================
+// LOGIN
+// ==========================================
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -466,9 +470,13 @@ exports.login = async (req, res) => {
       });
     }
 
-    console.log("✅ LOGIN: User found:", user.email);
-    console.log("📧 Email verified:", user.emailVerified);
-    console.log("🔐 Password exists:", !!user.password);
+    console.log("==========================================");
+    console.log("🔐 LOGIN ATTEMPT");
+    console.log("📧 Email:", user.email);
+    console.log("✅ Email Verified:", user.emailVerified);
+    console.log("🔑 Password Stored:", !!user.password);
+    console.log("🎓 Demo Mode:", process.env.DEMO_MODE);
+    console.log("==========================================");
 
     // ==========================================
     // GOOGLE-ONLY ACCOUNT
@@ -482,23 +490,6 @@ exports.login = async (req, res) => {
     }
 
     // ==========================================
-    // CHECK PASSWORD
-    // ==========================================
-
-    const passwordMatch = await bcrypt.compare(
-      password,
-      user.password
-    );
-
-    console.log("🔑 Password match:", passwordMatch);
-
-    if (!passwordMatch) {
-      return res.status(401).json({
-        message: "Invalid email or password"
-      });
-    }
-
-    // ==========================================
     // EMAIL VERIFICATION CHECK
     // ==========================================
 
@@ -508,6 +499,57 @@ exports.login = async (req, res) => {
           "Please verify your email using the OTP before logging in.",
         requiresVerification: true,
         email: user.email
+      });
+    }
+
+    // ==========================================
+    // COLLEGE DEMO MODE
+    // ==========================================
+    // In Demo Mode, an existing verified account
+    // can login without checking the password.
+    //
+    // This is ONLY for the college demonstration.
+    // Normal/production mode still checks bcrypt.
+
+    if (process.env.DEMO_MODE === "true") {
+      console.log("==========================================");
+      console.log("🎓 COLLEGE DEMO LOGIN");
+      console.log("📧 Verified user:", user.email);
+      console.log("✅ Password check bypassed for DEMO MODE");
+      console.log("==========================================");
+
+      const token = createToken(user._id);
+
+      return res.json({
+        message: "Login successful",
+        demoMode: true,
+
+        token,
+
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          emailVerified: user.emailVerified
+        }
+      });
+    }
+
+    // ==========================================
+    // NORMAL PASSWORD CHECK
+    // ==========================================
+
+    const passwordMatch = await bcrypt.compare(
+      password,
+      user.password
+    );
+
+    if (!passwordMatch) {
+      console.log("❌ LOGIN: Password does not match");
+
+      return res.status(401).json({
+        message: "Invalid email or password"
       });
     }
 
@@ -532,7 +574,7 @@ exports.login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Login Error:", error);
+    console.error("❌ Login Error:", error);
 
     return res.status(500).json({
       message: "Login failed"
