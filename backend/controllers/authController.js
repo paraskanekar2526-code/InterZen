@@ -60,11 +60,7 @@ const getOTPExpiry = () => {
 
 exports.register = async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      password
-    } = req.body;
+    const { name, email, password } = req.body;
 
     // ------------------------------
     // VALIDATION
@@ -72,20 +68,17 @@ exports.register = async (req, res) => {
 
     if (!name || !email || !password) {
       return res.status(400).json({
-        message:
-          "Name, email and password are required"
+        message: "Name, email and password are required"
       });
     }
 
     if (password.length < 6) {
       return res.status(400).json({
-        message:
-          "Password must be at least 6 characters"
+        message: "Password must be at least 6 characters"
       });
     }
 
-    const normalizedEmail =
-      email.toLowerCase().trim();
+    const normalizedEmail = email.toLowerCase().trim();
 
     // ------------------------------
     // FIND EXISTING USER
@@ -100,51 +93,52 @@ exports.register = async (req, res) => {
     // ==========================================
 
     if (user && !user.emailVerified) {
-
-      const verificationCode =
-        generateOTP();
+      const verificationCode = generateOTP();
 
       user.name = name;
 
-      user.password =
-        await bcrypt.hash(
-          password,
-          10
-        );
+      user.password = await bcrypt.hash(password, 10);
 
-      user.verificationCode =
-        verificationCode;
+      user.verificationCode = verificationCode;
 
-      user.verificationCodeExpires =
-        getOTPExpiry();
+      user.verificationCodeExpires = getOTPExpiry();
 
       await user.save();
 
-console.log("✅ USER SAVED TO MONGODB");
-console.log("📧 ABOUT TO SEND OTP TO:", user.email);
-console.log("🔢 OTP:", verificationCode);
+      // ==========================================
+      // COLLEGE DEMO MODE
+      // ==========================================
 
-// ==========================================
-// SEND OTP EMAIL
-// ==========================================
+      if (process.env.DEMO_MODE === "true") {
+        console.log("==========================================");
+        console.log("🎓 COLLEGE DEMO MODE");
+        console.log("📧 Verification Email:", user.email);
+        console.log("🔢 VERIFICATION OTP:", verificationCode);
+        console.log("==========================================");
 
-await sendVerificationOTP(
-  user.email,
-  user.name,
-  verificationCode
-);
+        return res.status(200).json({
+          message: "Account exists but is not verified. A new demo OTP has been generated.",
+          requiresVerification: true,
+          demoMode: true,
+          demoOtp: verificationCode,
+          email: user.email
+        });
+      }
 
-console.log("✅ OTP EMAIL FUNCTION COMPLETED");
+      // ==========================================
+      // NORMAL EMAIL MODE
+      // ==========================================
 
-      console.log(
-        "Verification OTP sent to:",
-        user.email
+      await sendVerificationOTP(
+        user.email,
+        user.name,
+        verificationCode
       );
 
       return res.status(200).json({
-        message:
-          "Account exists but is not verified. A new OTP has been sent to your email.",
+        message: "A new OTP has been sent to your email.",
         requiresVerification: true,
+        demoMode: false,
         email: user.email
       });
     }
@@ -155,8 +149,7 @@ console.log("✅ OTP EMAIL FUNCTION COMPLETED");
 
     if (user) {
       return res.status(400).json({
-        message:
-          "Email is already registered. Please login."
+        message: "Email is already registered. Please login."
       });
     }
 
@@ -164,21 +157,15 @@ console.log("✅ OTP EMAIL FUNCTION COMPLETED");
     // HASH PASSWORD
     // ==========================================
 
-    const hashedPassword =
-      await bcrypt.hash(
-        password,
-        10
-      );
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // ==========================================
     // GENERATE VERIFICATION OTP
     // ==========================================
 
-    const verificationCode =
-      generateOTP();
+    const verificationCode = generateOTP();
 
-    const verificationCodeExpires =
-      getOTPExpiry();
+    const verificationCodeExpires = getOTPExpiry();
 
     // ==========================================
     // CREATE USER
@@ -186,26 +173,36 @@ console.log("✅ OTP EMAIL FUNCTION COMPLETED");
 
     user = await User.create({
       name,
-
-      email:
-        normalizedEmail,
-
-      password:
-        hashedPassword,
-
-      role:
-        "student",
-
-      emailVerified:
-        false,
-
+      email: normalizedEmail,
+      password: hashedPassword,
+      role: "student",
+      emailVerified: false,
       verificationCode,
-
       verificationCodeExpires
     });
 
     // ==========================================
-    // SEND OTP EMAIL
+    // COLLEGE DEMO MODE
+    // ==========================================
+
+    if (process.env.DEMO_MODE === "true") {
+      console.log("==========================================");
+      console.log("🎓 COLLEGE DEMO MODE");
+      console.log("📧 Verification Email:", user.email);
+      console.log("🔢 VERIFICATION OTP:", verificationCode);
+      console.log("==========================================");
+
+      return res.status(201).json({
+        message: "Registration successful. Demo OTP generated.",
+        requiresVerification: true,
+        demoMode: true,
+        demoOtp: verificationCode,
+        email: user.email
+      });
+    }
+
+    // ==========================================
+    // NORMAL EMAIL MODE
     // ==========================================
 
     await sendVerificationOTP(
@@ -214,32 +211,18 @@ console.log("✅ OTP EMAIL FUNCTION COMPLETED");
       verificationCode
     );
 
-    console.log(
-      "Registration OTP sent to:",
-      user.email
-    );
-
-    // ==========================================
-    // RESPONSE
-    // ==========================================
-
     return res.status(201).json({
-      message:
-        "Registration successful. OTP sent to your email.",
+      message: "Registration successful. OTP sent to your email.",
       requiresVerification: true,
+      demoMode: false,
       email: user.email
     });
 
   } catch (error) {
-
-    console.error(
-      "Register Error:",
-      error
-    );
+    console.error("Register Error:", error);
 
     return res.status(500).json({
-      message:
-        "Registration failed",
+      message: "Registration failed",
       error:
         process.env.NODE_ENV === "development"
           ? error.message
@@ -354,87 +337,94 @@ exports.verifyEmail = async (
 // RESEND VERIFICATION OTP
 // ==========================================
 
-exports.resendVerification =
-  async (req, res) => {
+exports.resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
 
-    try {
-
-      const {
-        email
-      } = req.body;
-
-      if (!email) {
-        return res.status(400).json({
-          message:
-            "Email is required"
-        });
-      }
-
-      const normalizedEmail =
-        email.toLowerCase().trim();
-
-      const user =
-        await User.findOne({
-          email: normalizedEmail
-        });
-
-      if (!user) {
-        return res.status(404).json({
-          message:
-            "User not found"
-        });
-      }
-
-      // Already verified
-      if (user.emailVerified) {
-        return res.status(400).json({
-          message:
-            "Email is already verified"
-        });
-      }
-
-      // Generate new OTP
-      const verificationCode =
-        generateOTP();
-
-      user.verificationCode =
-        verificationCode;
-
-      user.verificationCodeExpires =
-        getOTPExpiry();
-
-      await user.save();
-
-      // Send email
-      await sendVerificationOTP(
-        user.email,
-        user.name,
-        verificationCode
-      );
-
-      console.log(
-        "New verification OTP sent to:",
-        user.email
-      );
-
-      return res.json({
-        message:
-          "New OTP sent to your email"
-      });
-
-    } catch (error) {
-
-      console.error(
-        "Resend OTP Error:",
-        error
-      );
-
-      return res.status(500).json({
-        message:
-          "Unable to resend OTP"
+    if (!email) {
+      return res.status(400).json({
+        message: "Email is required"
       });
     }
-  };
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({
+      email: normalizedEmail
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+    }
+
+    // Already verified
+    if (user.emailVerified) {
+      return res.status(400).json({
+        message: "Email is already verified"
+      });
+    }
+
+    // Generate new OTP
+    const verificationCode = generateOTP();
+
+    user.verificationCode = verificationCode;
+    user.verificationCodeExpires = getOTPExpiry();
+
+    await user.save();
+
+    // ==========================================
+    // COLLEGE DEMO MODE
+    // ==========================================
+
+    if (process.env.DEMO_MODE === "true") {
+      console.log("==========================================");
+      console.log("🎓 COLLEGE DEMO MODE");
+      console.log("📧 Verification Email:", user.email);
+      console.log("🔢 NEW VERIFICATION OTP:", verificationCode);
+      console.log("==========================================");
+
+      return res.json({
+        message: "New demo OTP generated successfully",
+        demoMode: true,
+        demoOtp: verificationCode,
+        email: user.email
+      });
+    }
+
+    // ==========================================
+    // NORMAL EMAIL MODE
+    // ==========================================
+
+    await sendVerificationOTP(
+      user.email,
+      user.name,
+      verificationCode
+    );
+
+    console.log(
+      "New verification OTP sent to:",
+      user.email
+    );
+
+    return res.json({
+      message: "New OTP sent to your email",
+      demoMode: false,
+      email: user.email
+    });
+
+  } catch (error) {
+    console.error(
+      "Resend OTP Error:",
+      error
+    );
+
+    return res.status(500).json({
+      message: "Unable to resend OTP"
+    });
+  }
+};
 
 // ==========================================
 // LOGIN
@@ -741,249 +731,385 @@ exports.testAuth =
 // FORGOT PASSWORD
 // ==========================================
 
-exports.forgotPassword =
-  async (req, res) => {
+// ==========================================
+// FORGOT PASSWORD
+// ==========================================
 
-    try {
+exports.forgotPassword = async (req, res) => {
 
-      const {
-        email
-      } = req.body;
+  try {
 
-      if (!email) {
-        return res.status(400).json({
-          message:
-            "Email is required"
-        });
-      }
+    const { email } = req.body;
 
-      const normalizedEmail =
-        email.toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({
+        message: "Email is required"
+      });
+    }
 
-      const user =
-        await User.findOne({
-          email: normalizedEmail
-        });
+    const normalizedEmail =
+      email.toLowerCase().trim();
 
-      if (!user) {
-        return res.status(404).json({
-          message:
-            "User not found"
-        });
-      }
+    const user = await User.findOne({
+      email: normalizedEmail
+    });
 
-      // Generate reset OTP
-      const resetCode =
-        generateOTP();
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+    }
 
-      user.resetCode =
-        resetCode;
+    // ==========================================
+    // GENERATE RESET OTP
+    // ==========================================
 
-      user.resetCodeExpires =
-        getOTPExpiry();
+    const resetCode = generateOTP();
 
-      await user.save();
+    user.resetCode = resetCode;
 
-      // ==========================================
-      // SEND PASSWORD RESET EMAIL
-      // ==========================================
+    user.resetCodeExpires =
+      getOTPExpiry();
 
-      await sendPasswordResetOTP(
-        user.email,
-        user.name,
+    await user.save();
+
+
+    // ==========================================
+    // COLLEGE DEMO MODE
+    // ==========================================
+
+    if (
+      process.env.DEMO_MODE === "true"
+    ) {
+
+      console.log(
+        "=========================================="
+      );
+
+      console.log(
+        "🎓 COLLEGE DEMO MODE"
+      );
+
+      console.log(
+        "📧 Reset Email:",
+        user.email
+      );
+
+      console.log(
+        "🔢 RESET OTP:",
         resetCode
       );
 
       console.log(
-        "Password reset OTP sent to:",
-        user.email
+        "=========================================="
       );
+
 
       return res.json({
+
         message:
-          "Password reset OTP sent successfully"
+          "Password reset code generated successfully",
+
+        demoMode: true,
+
+        demoOtp:
+          resetCode
+
       });
 
-    } catch (error) {
-
-      console.error(
-        "Forgot Password Error:",
-        error
-      );
-
-      return res.status(500).json({
-        message:
-          "Unable to process password reset"
-      });
     }
-  };
+
+
+    // ==========================================
+    // REAL EMAIL MODE
+    // ==========================================
+
+    await sendPasswordResetOTP(
+      user.email,
+      user.name,
+      resetCode
+    );
+
+    console.log(
+      "Password reset OTP sent to:",
+      user.email
+    );
+
+
+    return res.json({
+
+      message:
+        "Password reset OTP sent successfully",
+
+      demoMode: false
+
+    });
+
+
+  } catch (error) {
+
+    console.error(
+      "Forgot Password Error:",
+      error
+    );
+
+    return res.status(500).json({
+
+      message:
+        "Unable to process password reset"
+
+    });
+
+  }
+
+};
 
 // ==========================================
 // VERIFY RESET CODE
 // ==========================================
 
-exports.verifyResetCode =
-  async (req, res) => {
+// ==========================================
+// VERIFY RESET CODE
+// ==========================================
 
-    try {
+exports.verifyResetCode = async (req, res) => {
 
-      const {
-        email,
-        code
-      } = req.body;
+  try {
 
-      if (!email || !code) {
-        return res.status(400).json({
-          message:
-            "Email and verification code are required"
-        });
-      }
+    const {
+      email,
+      code
+    } = req.body;
 
-      const normalizedEmail =
-        email.toLowerCase().trim();
 
-      const enteredCode =
-        String(code).trim();
+    if (!email || !code) {
 
-      const user =
-        await User.findOne({
-          email: normalizedEmail
-        });
+      return res.status(400).json({
 
-      if (!user) {
-        return res.status(404).json({
-          message:
-            "User not found"
-        });
-      }
-
-      if (
-        !user.resetCode ||
-        user.resetCode !== enteredCode ||
-        !user.resetCodeExpires ||
-        user.resetCodeExpires < new Date()
-      ) {
-        return res.status(400).json({
-          message:
-            "Invalid or expired verification code"
-        });
-      }
-
-      return res.json({
         message:
-          "Verification code is valid"
+          "Email and verification code are required"
+
       });
 
-    } catch (error) {
-
-      console.error(
-        "Verify Reset Code Error:",
-        error
-      );
-
-      return res.status(500).json({
-        message:
-          "Unable to verify code"
-      });
     }
-  };
+
+
+    const normalizedEmail =
+      email.toLowerCase().trim();
+
+
+    const enteredCode =
+      String(code).trim();
+
+
+    const user =
+      await User.findOne({
+        email: normalizedEmail
+      });
+
+
+    if (!user) {
+
+      return res.status(404).json({
+
+        message:
+          "User not found"
+
+      });
+
+    }
+
+
+    // ==========================================
+    // CHECK OTP
+    // ==========================================
+
+    if (
+      !user.resetCode ||
+      user.resetCode !== enteredCode ||
+      !user.resetCodeExpires ||
+      user.resetCodeExpires < new Date()
+    ) {
+
+      return res.status(400).json({
+
+        message:
+          "Invalid or expired verification code"
+
+      });
+
+    }
+
+
+    return res.json({
+
+      message:
+        "Verification code is valid",
+
+      verified: true
+
+    });
+
+
+  } catch (error) {
+
+    console.error(
+      "Verify Reset Code Error:",
+      error
+    );
+
+
+    return res.status(500).json({
+
+      message:
+        "Unable to verify code"
+
+    });
+
+  }
+
+};
 
 // ==========================================
 // RESET PASSWORD
 // ==========================================
 
-exports.resetPassword =
-  async (req, res) => {
+// ==========================================
+// RESET PASSWORD
+// ==========================================
 
-    try {
+exports.resetPassword = async (req, res) => {
 
-      const {
-        email,
-        code,
-        newPassword
-      } = req.body;
+  try {
 
-      if (
-        !email ||
-        !code ||
-        !newPassword
-      ) {
-        return res.status(400).json({
-          message:
-            "Email, verification code and new password are required"
-        });
-      }
+    const {
+      email,
+      code,
+      newPassword
+    } = req.body;
 
-      if (newPassword.length < 6) {
-        return res.status(400).json({
-          message:
-            "New password must be at least 6 characters"
-        });
-      }
 
-      const normalizedEmail =
-        email.toLowerCase().trim();
+    if (
+      !email ||
+      !code ||
+      !newPassword
+    ) {
 
-      const enteredCode =
-        String(code).trim();
+      return res.status(400).json({
 
-      const user =
-        await User.findOne({
-          email: normalizedEmail
-        });
-
-      if (!user) {
-        return res.status(404).json({
-          message:
-            "User not found"
-        });
-      }
-
-      if (
-        !user.resetCode ||
-        user.resetCode !== enteredCode ||
-        !user.resetCodeExpires ||
-        user.resetCodeExpires < new Date()
-      ) {
-        return res.status(400).json({
-          message:
-            "Invalid or expired verification code"
-        });
-      }
-
-      // ==========================================
-      // UPDATE PASSWORD
-      // ==========================================
-
-      user.password =
-        await bcrypt.hash(
-          newPassword,
-          10
-        );
-
-      user.resetCode =
-        null;
-
-      user.resetCodeExpires =
-        null;
-
-      await user.save();
-
-      return res.json({
         message:
-          "Password reset successfully"
+          "Email, verification code and new password are required"
+
       });
 
-    } catch (error) {
+    }
 
-      console.error(
-        "Reset Password Error:",
-        error
+
+    if (newPassword.length < 6) {
+
+      return res.status(400).json({
+
+        message:
+          "New password must be at least 6 characters"
+
+      });
+
+    }
+
+
+    const normalizedEmail =
+      email.toLowerCase().trim();
+
+
+    const enteredCode =
+      String(code).trim();
+
+
+    const user =
+      await User.findOne({
+        email: normalizedEmail
+      });
+
+
+    if (!user) {
+
+      return res.status(404).json({
+
+        message:
+          "User not found"
+
+      });
+
+    }
+
+
+    // ==========================================
+    // VERIFY RESET OTP
+    // ==========================================
+
+    if (
+      !user.resetCode ||
+      user.resetCode !== enteredCode ||
+      !user.resetCodeExpires ||
+      user.resetCodeExpires < new Date()
+    ) {
+
+      return res.status(400).json({
+
+        message:
+          "Invalid or expired verification code"
+
+      });
+
+    }
+
+
+    // ==========================================
+    // UPDATE PASSWORD
+    // ==========================================
+
+    user.password =
+      await bcrypt.hash(
+        newPassword,
+        10
       );
 
-      return res.status(500).json({
-        message:
-          "Unable to reset password"
-      });
-    }
-  };
+
+    // ==========================================
+    // CLEAR RESET OTP
+    // ==========================================
+
+    user.resetCode = null;
+
+    user.resetCodeExpires = null;
+
+
+    await user.save();
+
+
+    return res.json({
+
+      message:
+        "Password reset successfully"
+
+    });
+
+
+  } catch (error) {
+
+    console.error(
+      "Reset Password Error:",
+      error
+    );
+
+
+    return res.status(500).json({
+
+      message:
+        "Unable to reset password"
+
+    });
+
+  }
+
+};
